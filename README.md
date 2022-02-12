@@ -9,6 +9,7 @@
 
 - `git clone` e `npm install`
 - `setar EMAIL (email) e PASS (senha) no arquivo .env`
+- `npm start`
 - `retornará um arquivo JSON com suas reviews cadastradas no site`
 
 ## Libs
