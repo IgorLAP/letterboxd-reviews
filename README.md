@@ -10,11 +10,13 @@
 - `git clone` e `npm install`
 - `setar EMAIL (email) e PASS (senha) no arquivo .env`
 - `npm start`
-- `retornará um arquivo JSON com suas reviews cadastradas no site`
+- `retornará arquivos JSON e TXT, com suas reviews cadastradas no site`
 
 ## Libs
 - `puppeteer`
 - `fs`
 - `dotenv`
+- `json-to-plain-text`
+- `readline-sync`
 
-# Atualmente retornando apenas a primeira página de reviews.
+# Opções atuais, trazer todos reviews ou algumas, baseado na quantidade de sua página 'Reviews'.
