@@ -6,9 +6,10 @@ const readline = require('readline-sync');
 
 console.log('📽 ✍️ 🤖 Letterboxd Reviews in JSON');
 (async () => {
-    let pages = await readline.question('Quantidade de páginas, em seu histórico de reviews, desejadas OU pressione "Enter" para trazer todas: ', {
-        encoding: 'utf-8'
-    });
+    let pages = await readline.question(
+        'Quantidade de páginas, em seu histórico de reviews, desejadas OU pressione "Enter" para trazer todas: ', 
+        { encoding: 'utf8' }
+    );
     const browser = await puppeteer.launch({headless: true});
     const page = await browser.newPage();
     await page.goto('https://letterboxd.com', {
@@ -27,7 +28,10 @@ console.log('📽 ✍️ 🤖 Letterboxd Reviews in JSON');
     
     if(error !== ''){
         throw new Error('Login falhou. Confira o seu arquivo .env');
+    } else {
+        console.log('Login realizado');
     }
+
     await page.waitForSelector('.nav-account');
     const userName = await page.evaluate(() => document.querySelector('.nav-account a').innerHTML.split('>').pop());
     await page.goto(`https://letterboxd.com/${userName}/films/reviews/`, {
@@ -42,7 +46,7 @@ console.log('📽 ✍️ 🤖 Letterboxd Reviews in JSON');
     const totalReviewPages = pages || await page.evaluate(()=>
     document.querySelector('.paginate-pages ul').lastElementChild.innerText);
     
-    let allReviews = [];
+    let allReviews;
 
     for(let i = 1; i<=totalReviewPages; i++){
         const clicks = await page.evaluate(()=> document.querySelectorAll('a.reveal.js-reveal'));
@@ -61,14 +65,20 @@ console.log('📽 ✍️ 🤖 Letterboxd Reviews in JSON');
                     title: separator.shift(),
                     rating: separator.shift(),
                     likes: separator.pop(),
-                    text: separator
+                    text: separator.map(i=>i.replace('\n', ' '))
                 }
             })
             return reviewsJsonLike;
         })
         console.log('Processando...');
-        console.log(`Na página ${i} de ${totalReviewPages}. Aguarde`)
-        allReviews.push(currentReviews);
+        console.log(`Na página ${i} de ${totalReviewPages}. Aguarde`);
+        
+        if(i == 1){
+            allReviews = currentReviews;
+        } else {    
+            allReviews.push(currentReviews);
+        }
+        
         if((i+1) <= totalReviewPages){
             await page.goto(`https://letterboxd.com/${userName}/films/reviews/page/${i+1}/`, {
                 waitUntil: 'load',
