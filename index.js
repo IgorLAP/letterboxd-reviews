@@ -4,12 +4,44 @@ const fs = require('fs');
 const convert = require('json-to-plain-text');
 const readline = require('readline-sync');
 
-console.log('📽 ✍️ 🤖 Letterboxd Reviews in JSON');
+// Refatorar
+// Adicionar último método
+// Tratar erro
+
+console.log('📽 ✍️ 🤖 Your Letterboxd Reviews easy for you');
 (async () => {
-    let pages = await readline.question(
-        'Quantidade de páginas, em seu histórico de reviews, desejadas OU pressione "Enter" para trazer todas: ', 
-        { encoding: 'utf8' }
-    );
+    const options = await readline.keyInSelect(
+        ['Todas Reviews', 'Ate uma pagina especifica', 'Entre paginas', 'Apenas uma pagina'],'Selecione uma opcao: '
+        );
+
+    if(options == -1){
+        return;
+    }
+
+    let initialPage = null;
+    let pages = null;
+    let finalPage = null;
+    switch(options){
+        case 0:
+            pages = null;
+            break;
+        case 1:
+            pages = await readline.question('Ate qual pagina deseja? ');
+            if(isNaN((Number(pages))) || pages == 0){
+                throw new Error('Quantidade de páginas inválida')
+            }
+            break;
+        case 2 :
+            initialPage = await readline.question('Pagina inicial: ');
+            finalPage = await readline.question('Pagina final: ');
+            if((isNaN(initialPage) || isNaN(finalPage)) || (initialPage == '' || finalPage == '')){
+                throw new Error('Erro nas páginas informadas');
+            }
+            break;
+        case 3:
+            break;
+    }
+
     const browser = await puppeteer.launch({headless: true});
     const page = await browser.newPage();
     await page.goto('https://letterboxd.com', {
@@ -34,22 +66,30 @@ console.log('📽 ✍️ 🤖 Letterboxd Reviews in JSON');
 
     await page.waitForSelector('.nav-account');
     const userName = await page.evaluate(() => document.querySelector('.nav-account a').innerHTML.split('>').pop());
-    await page.goto(`https://letterboxd.com/${userName}/films/reviews/`, {
-        waitUntil: 'load',
-        timeout: 0
-    });
+    if(options == 2){
+        await page.goto(`https://letterboxd.com/${userName}/films/reviews/page/${initialPage}`, {
+            waitUntil: 'load',
+            timeout: 0
+        });
+    } else {
+        await page.goto(`https://letterboxd.com/${userName}/films/reviews/`, {
+            waitUntil: 'load',
+            timeout: 0
+        });
+    }
     await page.waitForSelector('section.col-main');
     
-    if(isNaN((Number(pages))) || pages == 0){
-        throw new Error('Quantidade de páginas inválida')
-    }
-    const totalReviewPages = pages || await page.evaluate(()=>
+    //Tratar erro possível de passar um número a mais das páginas de reviews existentes
+    const totalReviewPages = (pages || finalPage) || await page.evaluate(()=>
     document.querySelector('.paginate-pages ul').lastElementChild.innerText);
     
     let allReviews;
 
-    for(let i = 1; i<=totalReviewPages; i++){
+    for(let i = Number(initialPage) || 1; i<=totalReviewPages; i++){
         const clicks = await page.evaluate(()=> document.querySelectorAll('a.reveal.js-reveal'));
+
+        console.log('Processando...');
+        console.log(`Na página ${i} de ${totalReviewPages}. Aguarde`);
 
         for(let i = 0; i<Object.keys(clicks).length; i++ ){
             await page.click('a.reveal.js-reveal');
@@ -70,13 +110,19 @@ console.log('📽 ✍️ 🤖 Letterboxd Reviews in JSON');
             })
             return reviewsJsonLike;
         })
-        console.log('Processando...');
-        console.log(`Na página ${i} de ${totalReviewPages}. Aguarde`);
         
-        if(i == 1){
-            allReviews = currentReviews;
-        } else {    
-            allReviews.push(currentReviews);
+        if(initialPage){
+            if(i == Number(initialPage)){
+                allReviews = currentReviews;
+            } else {
+                allReviews.push(...currentReviews);
+            }
+        } else {
+            if(i == 1){
+                allReviews = currentReviews;
+            } else {
+                allReviews.push(...currentReviews);
+            }
         }
         
         if((i+1) <= totalReviewPages){
