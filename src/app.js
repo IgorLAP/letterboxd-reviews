@@ -1,47 +1,11 @@
-const puppeteer = require('puppeteer');
-require('dotenv/config');
 const fs = require('fs');
+const path = require('path');
+
+const puppeteer = require('puppeteer');
 const convert = require('json-to-plain-text');
 const readline = require('readline-sync');
 
-// Refatorar
-// Adicionar último método
-// Tratar erro
-
-console.log('📽 ✍️ 🤖 Your Letterboxd Reviews easy for you');
-(async () => {
-    const options = await readline.keyInSelect(
-        ['Todas Reviews', 'Ate uma pagina especifica', 'Entre paginas', 'Apenas uma pagina'],'Selecione uma opcao: '
-        );
-
-    if(options == -1){
-        return;
-    }
-
-    let initialPage = null;
-    let pages = null;
-    let finalPage = null;
-    switch(options){
-        case 0:
-            pages = null;
-            break;
-        case 1:
-            pages = await readline.question('Ate qual pagina deseja? ');
-            if(isNaN((Number(pages))) || pages == 0){
-                throw new Error('Quantidade de páginas inválida')
-            }
-            break;
-        case 2 :
-            initialPage = await readline.question('Pagina inicial: ');
-            finalPage = await readline.question('Pagina final: ');
-            if((isNaN(initialPage) || isNaN(finalPage)) || (initialPage == '' || finalPage == '')){
-                throw new Error('Erro nas páginas informadas');
-            }
-            break;
-        case 3:
-            break;
-    }
-
+async function run(initialPage, pages, finalPage){
     const browser = await puppeteer.launch({headless: true});
     const page = await browser.newPage();
     await page.goto('https://letterboxd.com', {
@@ -50,7 +14,7 @@ console.log('📽 ✍️ 🤖 Your Letterboxd Reviews easy for you');
     });
 
     await page.click('[href="/sign-in/"]');
-    await page.type('input[type="email"]', process.env.EMAIL );
+    await page.type('input[type="email"]', process.env.EMAIL);
     await page.type('input[type="password"]', process.env.PASS);
     await page.click('input[type="submit"]');
     await delay(3000);
@@ -66,7 +30,7 @@ console.log('📽 ✍️ 🤖 Your Letterboxd Reviews easy for you');
 
     await page.waitForSelector('.nav-account');
     const userName = await page.evaluate(() => document.querySelector('.nav-account a').innerHTML.split('>').pop());
-    if(options == 2){
+    if(initialPage){
         await page.goto(`https://letterboxd.com/${userName}/films/reviews/page/${initialPage}`, {
             waitUntil: 'load',
             timeout: 0
@@ -77,22 +41,46 @@ console.log('📽 ✍️ 🤖 Your Letterboxd Reviews easy for you');
             timeout: 0
         });
     }
-    await page.waitForSelector('section.col-main');
-    
-    //Tratar erro possível de passar um número a mais das páginas de reviews existentes
-    const totalReviewPages = (pages || finalPage) || await page.evaluate(()=>
+    // Lidando com possíveis textos protegidos por spoilers não carregados pela página
+    await page.evaluate(()=>{
+        const hidden = document.querySelectorAll('.hidden-spoilers.expanded-text');
+        if(hidden){
+            [...hidden].forEach(i=>i.style.display = 'block');
+        }
+    })
+    let totalReviewPages = await page.evaluate(()=>
     document.querySelector('.paginate-pages ul').lastElementChild.innerText);
+
+    if(
+        (finalPage || pages) && 
+        (Number(finalPage) > Number(totalReviewPages) || Number(pages) > Number(totalReviewPages))
+    ){
+        const ans = readline.keyInYN(`Pagina ${finalPage || pages} inexistente! Deseja selecionar ate a ultima, ${totalReviewPages}, no perfil de ${userName}? `);
+        if(!ans){
+            throw new Error('Páginal final inexistente');
+        }
+    }
     
+    if(finalPage && !pages){
+        totalReviewPages = finalPage;
+    } else if(!finalPage && pages){
+        totalReviewPages = pages;
+    }
+
     let allReviews;
 
-    for(let i = Number(initialPage) || 1; i<=totalReviewPages; i++){
-        const clicks = await page.evaluate(()=> document.querySelectorAll('a.reveal.js-reveal'));
+    for(let i = Number(initialPage) || 1; i <= totalReviewPages; i++){
+        const clicks = await page.evaluate(()=> document.querySelectorAll('a[href="#"].reveal.js-reveal'));
 
         console.log('Processando...');
-        console.log(`Na página ${i} de ${totalReviewPages}. Aguarde`);
+        if(i == totalReviewPages){
+            console.log(`Pegando reviews da pagina ${i}`)
+        } else {
+            console.log(`Na página ${i} de ${totalReviewPages}. Aguarde`);
+        }
 
         for(let i = 0; i<Object.keys(clicks).length; i++ ){
-            await page.click('a.reveal.js-reveal');
+            await page.click('a[href="#"].reveal.js-reveal')
             await delay(3000);
         }
 
@@ -133,19 +121,21 @@ console.log('📽 ✍️ 🤖 Your Letterboxd Reviews easy for you');
         }
     }
     
-    fs.writeFile(`./your-reviews/${userName}-reviews.txt`, convert.toPlainText(allReviews), err=>{
+    fs.writeFile(path.join(__dirname, `./../your-reviews/${userName}-reviews.txt`), convert.toPlainText(allReviews), err=>{
         if(err) console.log(err)
     })
-    fs.writeFile(`./your-reviews/${userName}-reviews.json`, JSON.stringify(allReviews, null, 2), err=>{
+    fs.writeFile(path.join(__dirname, `./../your-reviews/${userName}-reviews.json`), JSON.stringify(allReviews, null, 2), err=>{
         if(err) console.log(err)
     })
 
     await browser.close();
-    console.log('Finalizado!')
-})();
+    console.log('Finalizado!');
+}
 
 function delay(time){
     return new Promise(resolve=>{
         setTimeout(resolve, time);
     })
 }
+
+module.exports = run;
