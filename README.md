@@ -19,4 +19,13 @@
 - `json-to-plain-text`
 - `readline-sync`
 
-# Opções atuais, trazer todos reviews ou algumas, baseado na quantidade de sua página 'Reviews'.
+## Opções atuais:
+
+1. Trazer todas Reviews Cadastradas 
+     - [reviews até a última página]
+1. Até uma página especifica
+     - [ex: input: 7 | output: reviews entre as páginas 1 à 7]
+1. Entre determinadas páginas
+     - [ex: input: 3, 7 | output: reviews entre as páginas 3 à 7]
+1. Apenas uma página
+     - [input: 10 | output: todas reviews da página 10]
